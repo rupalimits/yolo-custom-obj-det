@@ -1,113 +1,216 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>YOLO Object Detection — Static Demo</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-<style>
-body{margin:0;font-family:'Segoe UI',sans-serif;background:#f5f5f5;color:#222}
-header{padding:20px;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.1)}
-h2{margin:0}
-.container{display:flex;padding:20px;gap:20px}
-#videoContainer{position:relative;height:700px;border-radius:8px;overflow:hidden}
-#video{width:100%;height:100%;object-fit:contain;background:#000}
-#overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
-.rightBar{width:350px;background:#fff;border-radius:8px;box-shadow:0 2px 5px rgba(0,0,0,.1);display:flex;flex-direction:column;gap:15px;overflow:auto}
-.rightBar>div{padding:0 15px}
-.rightBar>*:first-child,.rightBar>*:last-child{padding:15px}
-button{padding:8px 12px;background:#4caf50;color:#fff;border:none;border-radius:4px;cursor:pointer}
-button:hover{background:#45a049}
-#crossingList,#plateList{list-style:none;padding:8px;margin:0;max-height:200px;overflow-y:auto;font-family:monospace;background:#fff;border:1px solid #ccc;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,.1)}
-#crossingList li,#plateList li{padding:4px 6px;border-bottom:1px solid #eee;font-size:13px}
-#crossingList li:last-child{border-bottom:none}
-</style>
-</head>
-<body>
-<header><h2>YOLO Object Detection — Static Viewer</h2></header>
+  <head>
+    <meta charset="UTF-8" />
+    <title>YOLO Object Detection — Static Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Segoe UI", sans-serif;
+        background: #f5f5f5;
+        color: #222;
+      }
+      header {
+        padding: 20px;
+        background: #fff;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+      h2 {
+        margin: 0;
+      }
+      .container {
+        display: flex;
+        padding: 20px;
+        gap: 20px;
+      }
+      #videoContainer {
+        position: relative;
+        height: 700px;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      #video {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #000;
+      }
+      #overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      .rightBar {
+        width: 350px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        overflow: auto;
+      }
+      .rightBar > div {
+        padding: 0 15px;
+      }
+      .rightBar > *:first-child,
+      .rightBar > *:last-child {
+        padding: 15px;
+      }
+      button {
+        padding: 8px 12px;
+        background: #4caf50;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #45a049;
+      }
+      #crossingList,
+      #plateList {
+        list-style: none;
+        padding: 8px;
+        margin: 0;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      #crossingList li,
+      #plateList li {
+        padding: 4px 6px;
+        border-bottom: 1px solid #eee;
+        font-size: 13px;
+      }
+      #crossingList li:last-child {
+        border-bottom: none;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h2>YOLO Object Detection — Static Viewer</h2>
+    </header>
 
-<div class="container" style="height:calc(100vh - 8rem);">
-  <div style="flex:1;display:flex;flex-direction:column;height:100%;overflow:auto;">
-    <div id="videoContainer">
-      <video id="video" controls></video>
+    <div class="container" style="height: calc(100vh - 8rem)">
+      <div
+        style="
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          overflow: auto;
+        "
+      >
+        <div id="videoContainer">
+          <video id="video" controls></video>
+        </div>
+        <div style="padding: 1.5rem">
+          <p id="statusText" style="display: none">Loading video...</p>
+        </div>
+      </div>
+
+      <div class="rightBar">
+        <div>
+          <label for="exampleEl">Select Example</label>
+          <select id="exampleEl" style="padding: 0.5rem; width: 100%; height: 2.5rem">
+            <option value="NumberPlateDetHighway">Number Plate Detection Highway</option>
+            <option value="SpeedDetectionHighway">Speed Detection Highway</option>
+            <option value="person">Person Detection</option>
+            <option value="ObjDetNight">Object Detection In Night</option>
+          </select>
+        </div>
+
+        <div>
+          <h3>Line crossing</h3>
+          <ul id="crossingList"></ul>
+        </div>
+        <div>
+          <h3>Events</h3>
+          <ul id="plateList"></ul>
+        </div>
+
+        <div
+          style="
+            justify-content: end;
+            margin-top: auto;
+            position: sticky;
+            bottom: 0;
+            display: flex;
+            gap: 1rem;
+          "
+        >
+          <!-- Upload disabled
+          <label for="fileInput" class="file-btn">Select Video</label>
+          <input type="file" id="fileInput" accept="video/*" style="display:none">
+          <button id="uploadBtn">Play Local</button>
+          -->
+          <button id="downloadBtn">Download CSV</button>
+        </div>
+      </div>
     </div>
-    <div style="padding:1.5rem;">
-      <p id="statusText" style="display:none;">Loading video...</p>
-    </div>
-  </div>
 
-  <div class="rightBar">
-    <div>
-      <label for="exampleEl">Select Example</label>
-      <select id="exampleEl" style="padding:.5rem;width:100%;height:2.5rem;">
-        <option value="NumberPlateDetHighway">Number Plate Detection Highway</option>
-        <option value="SpeedDetectionHighway">Speed Detection Highway</option>
-        <option value="person">Person Detection</option>
-        <option value="ObjDetNight">Object Detection In Night</option>
-      </select>
-    </div>
+    <script>
+      const video = document.getElementById("video");
+      const exampleEl = document.getElementById("exampleEl");
+      const statusText = document.getElementById("statusText");
+      let example = exampleEl.value;
 
-    <div><h3>Line crossing</h3><ul id="crossingList"></ul></div>
-    <div><h3>Events</h3><ul id="plateList"></ul></div>
+      // Load CSV and Video (static from uploads/)
+      async function loadCSV(url) {
+        const text = await fetch(url).then((r) => r.text());
+        const { data } = Papa.parse(text, { header: true, skipEmptyLines: true });
+        return data;
+      }
 
-    <div style="justify-content:end;margin-top:auto;position:sticky;bottom:0;display:flex;gap:1rem;">
-      <!-- Upload disabled
-      <label for="fileInput" class="file-btn">Select Video</label>
-      <input type="file" id="fileInput" accept="video/*" style="display:none">
-      <button id="uploadBtn">Play Local</button>
-      -->
-      <button id="downloadBtn">Download CSV</button>
-    </div>
-  </div>
-</div>
+      async function preload() {
+        const filename = example;
+        try {
+          const data = await loadCSV(`uploads/detections-${filename}.csv`);
+          video.src = `uploads/${filename}.mp4`;
+          video.load();
+          statusText.style.display = "none";
+          console.log("Loaded", filename);
+        } catch (e) {
+          statusText.style.display = "block";
+          statusText.innerText =
+            "Failed to load static assets — ensure uploads/*.mp4 and uploads/detections-*.csv exist.";
+          console.error(e);
+        }
+      }
 
-<script>
-const video=document.getElementById('video');
-const exampleEl=document.getElementById('exampleEl');
-const statusText=document.getElementById('statusText');
-let example=exampleEl.value;
+      // Change example
+      exampleEl.onchange = () => {
+        example = exampleEl.value;
+        preload();
+      };
 
-// Load CSV and Video (static from uploads/)
-async function loadCSV(url){
-  const text=await fetch(url).then(r=>r.text());
-  const {data}=Papa.parse(text,{header:true,skipEmptyLines:true});
-  return data;
-}
+      // Disable upload button (commented out)
+      // document.getElementById('uploadBtn').onclick=()=>{};
 
-async function preload(){
-  const filename=example;
-  try{
-    const data=await loadCSV(`uploads/detections-${filename}.csv`);
-    video.src=`uploads/${filename}.mp4`;
-    video.load();
-    statusText.style.display='none';
-    console.log('Loaded',filename);
-  }catch(e){
-    statusText.style.display='block';
-    statusText.innerText='Failed to load static assets — ensure uploads/*.mp4 and uploads/detections-*.csv exist.';
-    console.error(e);
-  }
-}
+      // Download CSV
+      document.getElementById("downloadBtn").onclick = () => {
+        const href = `uploads/detections-${example}.csv`;
+        const a = document.createElement("a");
+        a.href = href;
+        a.download = `detections-${example}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      };
 
-// Change example
-exampleEl.onchange=()=>{
-  example=exampleEl.value;
-  preload();
-};
-
-// Disable upload button (commented out)
-// document.getElementById('uploadBtn').onclick=()=>{};
-
-// Download CSV
-document.getElementById('downloadBtn').onclick=()=>{
-  const href=`uploads/detections-${example}.csv`;
-  const a=document.createElement('a');
-  a.href=href;a.download=`detections-${example}.csv`;
-  document.body.appendChild(a);a.click();a.remove();
-};
-
-// Load first video by default
-window.addEventListener('DOMContentLoaded', preload);
-</script>
-</body>
+      // Load first video by default
+      window.addEventListener("DOMContentLoaded", preload);
+    </script>
+  </body>
 </html>
