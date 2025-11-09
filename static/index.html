@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>YOLO Detection with Speed</title>
+<style>
+body {
+    margin:0;
+    font-family:'Segoe UI',sans-serif;
+    background:#f5f5f5;
+    color:#222;
+}
+header {
+    padding:20px;
+    text-align:center;
+    background:#fff;
+    box-shadow:0 2px 5px rgba(0,0,0,0.1);
+}
+h2 { margin:0; }
+
+.container {
+    display:flex;
+    padding:20px;
+    gap:20px;
+}
+
+#videoContainer {
+    position:relative;
+    height:700px;
+    background:#000;
+    border-radius:8px;
+    overflow:hidden;
+}
+
+#video {
+    width:100%;
+    height:100%;
+    object-fit:contain;
+}
+
+#overlay {
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    pointer-events:none;
+}
+
+/* draggable lines */
+.line {
+    position:absolute;
+    left:0;
+    width:100%;
+    height:3px;
+    cursor:ns-resize;
+    z-index:5;
+}
+#lineA {
+    background:red;
+    top:300px;
+}
+#lineB {
+    background:blue;
+    top:400px;
+}
+.line-label {
+    position:absolute;
+    left:10px;
+    color:white;
+    font-weight:bold;
+    font-size:13px;
+    text-shadow:0 0 3px black;
+    pointer-events:none;
+}
+
+.rightBar {
+    width: 350px;
+    background:#fff;
+    border-radius:8px;
+    padding:15px;
+    box-shadow:0 2px 5px rgba(0,0,0,0.1);
+    display:flex;
+    flex-direction:column;
+    gap:15px;
+}
+input[type=range] { width:100%; }
+label { font-size:14px;font-weight:600; }
+
+#progressBar {
+    width:100%;
+    height:12px;
+    background:#ddd;
+    border-radius:6px;
+    overflow:hidden;
+    margin:10px 0;
+}
+#progressFill {
+    height:100%;
+    width:0;
+    background:#4caf50;
+    transition:width 0.2s;
+}
+
+button {
+    padding:8px 12px;
+    background:#4caf50;
+    color:white;
+    border:none;
+    border-radius:4px;
+    cursor:pointer;
+}
+button:hover { background:#45a049; }
+
+input[type=text], input[type=number] {
+    width:100%;
+    padding:6px;
+    border:1px solid #ccc;
+    border-radius:4px;
+}
+</style>
+
+<style>
+/* --- Crossing list UI --- */
+#crossingList {
+    list-style: none;        /* Remove bullets */
+    padding: 0;              /* Remove default padding */
+    margin: 0;               /* Remove default margin */
+    max-height: 200px;       /* Scrollable if too long */
+    overflow-y: auto;
+    font-family: monospace;  /* Fixed-width for numbers */
+    background: #fff;        /* White background */
+    border: 1px solid #ccc;  /* Light border */
+    border-radius: 6px;
+    padding: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#crossingList li {
+    padding: 4px 6px;
+    border-bottom: 1px solid #eee;
+    font-size: 13px;
+}
+
+#crossingList li:last-child {
+    border-bottom: none; /* Remove bottom border on last item */
+}
+
+
+
+
+
+/* --- Styled file input button --- */
+.file-btn {
+    display: inline-block;
+    padding: 8px 15px;
+    background: #4caf50;
+    color: white;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.2s;
+}
+.file-btn:hover {
+    background: #45a049;
+}
+.file-btn:active {
+    background: #3e8e41;
+}
+
+
+</style>
+
+</head>
+<body>
+<header>
+    <h2>YOLO Detection + Speed Measurement</h2>
+</header>
+
+<div class="container">
+    <div style="flex:1;display:flex;flex-direction:column;">
+        <div id="videoContainer">
+            <video id="video" controls></video>
+            <canvas id="overlay"></canvas>
+
+            <!-- Draggable lines -->
+            <div id="lineA" class="line"><span class="line-label"></span></div>
+            <div id="lineB" class="line"><span class="line-label"></span></div>
+        </div>
+
+        <div style="padding:1.5rem;">
+            <div id="progressBar"><div id="progressFill"></div></div>
+            <p id="statusText">Waiting for upload...</p>
+        </div>
+    </div>
+
+    <div class="rightBar">
+
+            <label for="fileInput" class="file-btn">Select Video</label>
+            <input type="file" id="fileInput" accept="video/*" style="display:none">
+            <button id="uploadBtn">Upload & Process</button>
+
+
+        <div>
+            <label for="confSlider">Confidence Threshold: <span id="confValue">0.5</span></label>
+            <input type="range" id="confSlider" min="0" max="1" step="0.05" value="0.5">
+        </div>
+
+        <div>
+            <label for="classFilter">Filter Classes (comma-separated)</label>
+            <input type="text" id="classFilter" placeholder="person,car,bike">
+        </div>
+
+        <div>
+            <label for="lineDistance">Distance between lines (meters)</label>
+            <input type="number" id="lineDistance" value="10" min="0" step="0.1" placeholder="e.g. 5">
+        </div>
+
+        <div>
+            <input type="checkbox" id="showPlates">
+            <label for="showPlates">Show License Plate Boxes</label>
+        </div>
+
+
+
+        <div style="margin-top:15px;">
+            <h3>Vehicles Crossing Lines</h3>
+            <ul id="crossingList" style="list-style:none; padding:0; max-height:200px; overflow-y:auto; font-family:monospace;"></ul>
+        </div>
+
+
+        <div style="margin-top:15px;">
+            <h3>Number plates</h3>
+            <ul id="plateList" style="list-style:none; padding:0; max-height:200px; overflow-y:auto; font-family:monospace;"></ul>
+        </div>
+        
+
+    </div>
+</div>
+
+<script>
+const fileInput = document.getElementById("fileInput");
+const uploadBtn = document.getElementById("uploadBtn");
+const progressFill = document.getElementById("progressFill");
+const statusText = document.getElementById("statusText");
+const video = document.getElementById("video");
+const canvas = document.getElementById("overlay");
+const ctx = canvas.getContext("2d");
+
+const confSlider = document.getElementById("confSlider");
+const confValue = document.getElementById("confValue");
+const classFilter = document.getElementById("classFilter");
+const lineA = document.getElementById("lineA");
+const lineB = document.getElementById("lineB");
+const lineDistanceInput = document.getElementById("lineDistance");
+const showPlatesCheckbox = document.getElementById("showPlates");
+
+
+lineA.style.top = '300px'
+lineB.style.top = '400px'
+
+let csvData = {};
+let plateData = {};
+let plateNumberData = {};
+let platesMemo = {};
+let processedFrames = 0;
+let totalFrames = 0;
+let processedTimeLimit = 0;
+let filterConf = parseFloat(confSlider.value);
+let filterClasses = [];
+
+let objectTracks = {};  // store crossing data and speeds
+let listed = new Set();
+
+confSlider.oninput = () => {
+    filterConf = parseFloat(confSlider.value);
+    confValue.innerText = filterConf.toFixed(2);
+};
+classFilter.oninput = () => {
+    filterClasses = classFilter.value.split(",").map(s=>s.trim()).filter(Boolean);
+};
+
+uploadBtn.onclick = async () => {
+    const file = fileInput.files[0];
+    if(!file){ alert("Select a video first"); return; }
+    const formData = new FormData();
+    formData.append("video", file);
+    statusText.innerText = "Uploading and processing...";
+    await fetch("/upload", { method:"POST", body: formData });
+    loadVideo();
+    const eventSource = new EventSource("/progress");
+    eventSource.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        const { frame, total, done, percent, new_data, plates, plate_numbers } = data;
+        totalFrames = total || totalFrames;
+        processedFrames = frame;
+        progressFill.style.width = percent + "%";
+        statusText.innerText = `Processing frame ${frame}/${total}`;
+        if(video.duration && totalFrames){
+            processedTimeLimit = (processedFrames / totalFrames) * video.duration;
+        }
+        if(new_data && new_data.length>0){
+            for(const d of new_data){
+                if(!csvData[d.frame]) csvData[d.frame]=[];
+                csvData[d.frame].push(d);
+            }
+        }
+        for(const plate of plates) {
+            if(!plateData[plate.frame])plateData[plate.frame] = []
+            plateData[plate.frame].push(plate)
+        }
+        for(const plate of plate_numbers) {
+            if(!plateNumberData[plate.frame])plateNumberData[plate.frame] = []
+            plateNumberData[plate.frame].push(plate)
+        }
+        if(done){
+            statusText.innerText = "Processing complete!";
+            eventSource.close();
+        }
+    }
+};
+
+function loadVideo(){
+    video.src = URL.createObjectURL(fileInput.files[0]);
+    function resizeCanvas(){
+        canvas.width = video.clientWidth;
+        canvas.height = video.clientHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    video.addEventListener("timeupdate", ()=>{
+        if(video.currentTime > processedTimeLimit){
+            video.pause();
+            video.currentTime = processedTimeLimit;
+            statusText.innerText = "Only processed portion is viewable.";
+        }
+    });
+    video.addEventListener("seeked", drawOverlay);
+    video.addEventListener("play", ()=>requestAnimationFrame(drawOverlay));
+    video.addEventListener("pause", drawOverlay);
+}
+
+// === Draggable line logic ===
+let dragging = null;
+let container = document.getElementById("videoContainer");
+[lineA,lineB].forEach(line=>{
+    line.addEventListener("mousedown", e=>{
+        dragging = line;
+        document.body.style.userSelect = "none";
+    });
+});
+window.addEventListener("mousemove", e=>{
+    if(!dragging) return;
+    const rect = container.getBoundingClientRect();
+    let newY = e.clientY - rect.top;
+    newY = Math.max(0, Math.min(rect.height, newY));
+    dragging.style.top = newY + "px";
+});
+window.addEventListener("mouseup", ()=>{
+    dragging = null;
+    document.body.style.userSelect = "auto";
+});
+
+
+
+function drawOverlay() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!csvData || Object.keys(csvData).length === 0) return;
+
+    const allFrameIds = Object.keys(csvData).map(Number);
+    const totalFramesLocal = Math.max(...allFrameIds);
+    const fps = totalFramesLocal / video.duration;
+
+    const approxFrame = Math.floor(video.currentTime * fps);
+    const nearestFrame = allFrameIds.reduce((prev, curr) =>
+        Math.abs(curr - approxFrame) < Math.abs(prev - approxFrame) ? curr : prev
+    );
+
+    const dets = csvData[nearestFrame];
+    if (!dets) return;
+
+    const lineAY = parseFloat(lineA.style.top);
+    const lineBY = parseFloat(lineB.style.top);
+    const lineDistMeters = parseFloat(lineDistanceInput.value) || 0;
+
+    // Compute scaling between video and displayed size
+    const videoAspect = video.videoWidth / video.videoHeight;
+    const containerAspect = video.clientWidth / video.clientHeight;
+    let scaleX, scaleY, offsetX = 0, offsetY = 0;
+    if (videoAspect > containerAspect) {
+        scaleX = video.clientWidth / video.videoWidth;
+        scaleY = scaleX;
+        offsetY = (video.clientHeight - video.videoHeight * scaleY) / 2;
+    } else {
+        scaleY = video.clientHeight / video.videoHeight;
+        scaleX = scaleY;
+        offsetX = (video.clientWidth - video.videoWidth * scaleX) / 2;
+    }
+
+    for (const d of dets) {
+        if (d.confidence < filterConf) continue;
+        if (filterClasses.length > 0 && !filterClasses.includes(d.class)) continue;
+
+        const x1 = d.x1 * scaleX + offsetX;
+        const y1 = d.y1 * scaleY + offsetY;
+        const x2 = d.x2 * scaleX + offsetX;
+        const y2 = d.y2 * scaleY + offsetY;
+        const centerY = (y1 + y2) / 2;
+        const id = d.id;
+
+        if (!objectTracks[id] || objectTracks[id].lastFrameId > nearestFrame) objectTracks[id] = {
+            crossedA: false,
+            crossedB: false,
+            frameA: null,
+            frameB: null,
+            speed: null,
+            lastFrameId: null,
+            lastY: null
+        };
+
+
+
+
+
+        
+        const track = objectTracks[id];
+
+        if(track.lastY && track.lastFrameId < nearestFrame) {
+            if((track.lastY < lineAY && lineAY < centerY) || (track.lastY > lineAY && lineAY > centerY)) {
+                track.crossedA = true
+                track.frameA = nearestFrame;
+                // console.log(`ID: ${id}, A ${nearestFrame}`)
+            }
+
+            if((track.lastY < lineBY && lineBY < centerY) || (track.lastY > lineBY && lineBY > centerY)) {
+                track.crossedB = true
+                track.frameB = nearestFrame;
+                // console.log(`ID: ${id}, B ${nearestFrame}`)
+            }
+        }
+
+
+
+        // Maintain last Y positions
+        track.lastY = centerY;
+        track.lastFrameId = nearestFrame;
+
+
+        // find plate number if exist
+        let plate_number = ''
+        const plateNumberFrameData = plateNumberData[nearestFrame]
+        if(plateNumberFrameData) {
+            const currentItem = plateNumberFrameData.find(x => x.car_id == id)
+            if(currentItem){
+                plate_number = currentItem.number
+            }
+        }
+
+        // if(!platesMemo[plateData]) {
+        //     platesMemo[plate_number] = {frame, car_id: id}
+        //     const plateList = document.getElementById("plateList");
+        //     const li = document.createElement("li");
+        //     li.textContent = `${plate_number}, Time: ${video.currentTime.toFixed(2)} s`;
+        //     plateList.appendChild(li);
+        // }
+
+
+
+        // --- Compute speed only once ---
+        if (track.crossedA && track.crossedB && track.speed === null && lineDistMeters > 0) {
+            const frameDiff = Math.abs(track.frameB - track.frameA);
+            const timeSec = frameDiff / fps;
+            if (timeSec != 0) { 
+                track.speed = (lineDistMeters / timeSec) * 3.6; // m/s
+                // console.log(`ID: ${id}, speed: ${track.speed}`)
+                console.log(`${id} speed: ${track.speed.toFixed(2)} time: ${video.currentTime}`)
+            }
+            
+        }
+
+        // --- Pick box color ---
+        let color = "lime";
+        if ((track.crossedA && !track.crossedB) || (track.crossedB && !track.crossedA)) color = "blue";
+        else if (track.crossedA && track.crossedB) color = "yellow";
+
+
+
+
+        if(track.speed || track.crossedA || track.crossedB) {
+            // --- Draw box ---
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5; // thinner lines
+            ctx.globalAlpha = 0.7; // slight transparency
+            ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+            ctx.globalAlpha = 1.0; // reset alpha for text
+        }
+
+        if(track.speed) {
+
+            // --- Label ---
+            let label =  `${plate_number} ${(track.speed).toFixed(2)} km/h`;
+            const textWidth = ctx.measureText(label).width + 6;
+            ctx.fillStyle = "rgba(255,255,255,0.6)"; // slightly transparent background
+            ctx.fillRect(x1, y1 - 18, textWidth, 18);
+
+            ctx.fillStyle = "black";
+            ctx.font = "13px monospace"; // slightly smaller font for thin boxes
+            ctx.fillText(label, x1 + 3, y1 - 5);
+        }
+
+        if (track.crossedA && track.crossedB && track.speed !== null && !listed.has(id)) {
+            // Mark as listed so we don’t add it multiple times
+            listed.add(id)
+
+            const crossingList = document.getElementById("crossingList");
+            const li = document.createElement("li");
+            li.textContent = `ID: ${plate_number || id}, Speed: ${(track.speed).toFixed(2)} km/h, Time: ${video.currentTime.toFixed(2)} s`;
+            crossingList.appendChild(li);
+        }
+
+        if (showPlatesCheckbox.checked) {
+            const plates = plateData[nearestFrame] || []
+            for(const plate of plates) {
+
+
+                const x1 = plate.x1 * scaleX + offsetX;
+                const y1 = plate.y1 * scaleY + offsetY;
+                const x2 = plate.x2 * scaleX + offsetX;
+                const y2 = plate.y2 * scaleY + offsetY;
+
+                ctx.strokeStyle = 'green';
+                ctx.lineWidth = 1; // thinner lines
+                ctx.globalAlpha = 0.7; // slight transparency
+                ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+            }
+        }
+
+
+
+        
+    }
+
+    if (!video.paused && !video.ended) {
+        requestAnimationFrame(drawOverlay);
+    }
+}
+
+
+
+</script>
+</body>
+</html>
