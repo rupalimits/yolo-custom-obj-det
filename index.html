@@ -182,6 +182,13 @@ input[type=text], input[type=number] {
 
 </style>
 
+
+<style>
+  /* Static mode: hide upload-related controls */
+  #uploadBtn, #fileInput, label[for="fileInput"] { display: none !important; }
+  #progressBar { display: none !important; }
+</style>
+
 </head>
 <body>
 <header>
@@ -189,7 +196,7 @@ input[type=text], input[type=number] {
     <!-- <a href='/static/replay.html'>open processed files</a> -->
 </header>
 <!-- <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script> -->
-<script src="/static/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <div class="container" style="height: calc(100vh - 8rem);">
     <div style="flex:1;display:flex;flex-direction:column;height: 100%;overflow: auto;">
@@ -344,7 +351,7 @@ $('blurSourceVideo').onchange = () => {
 
 document.getElementById("downloadBtn").addEventListener("click", async () => {
   try {
-    const response = await fetch(`/uploads/detections-${example}.csv`, {
+    const response = await fetch(`uploads/detections-${example}.csv`, {
       method: "GET",
     });
 
@@ -479,46 +486,7 @@ function processData(data) {
 }
 
 
-uploadBtn.onclick = async () => {
-    plateList.innerText = ''
-    crossingList.innerText = ''
-    const file = fileInput.files[0];
-    if(!file){ alert("Select a video first"); return; }
-    const formData = new FormData();
-    formData.append("video", file);
-
-    statusText.style.display = 'block'
-    $("progressBar").style.display = 'block'
-
-    statusText.innerText = "Uploading and processing...";
-    await fetch("/upload", { method:"POST", body: formData });
-    loadVideo();
-    const eventSource = new EventSource("/progress");
-    csvData = {}
-    plateData = {}
-    plateNumberData = {}
-    platesMemo = {}
-    carPlateMap = {}
-    trackingLines = {}
-    eventSource.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        const { frame, total, done, percent, new_data } = data;
-        totalFrames = total || totalFrames;
-        processedFrames = frame;
-        progressFill.style.width = percent + "%";
-        statusText.innerText = `Processing frame ${frame}/${total}`;
-        if(video.duration && totalFrames){
-            processedTimeLimit = (processedFrames / totalFrames) * video.duration;
-        }
-
-        processData(data.new_data)
-
-        if(done){
-            statusText.innerText = "Processing complete!";
-            eventSource.close();
-        }
-    }
-};
+uploadBtn && (uploadBtn.onclick = () => alert('Uploads are disabled in static mode. Use the dropdown examples.'));
 
 function loadVideo(){
     video.src = URL.createObjectURL(fileInput.files[0]);
@@ -570,8 +538,8 @@ async function loadCSV(url) {
 
 async function preload() {
     const filename = example 
-    const data = await loadCSV(`/uploads/detections-${filename}.csv`);
-    video.src = `/uploads/${filename}.mp4`
+    const data = await loadCSV(`uploads/detections-${filename}.csv`);
+    video.src = `uploads/${filename}.mp4`
     video.load();
     // console.log(data);
     plateList.innerText = ''
