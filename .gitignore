@@ -1,5 +1,3 @@
 .idea/
 .venv/
 .DS_Store
-static/index.html
-static/replay.html
